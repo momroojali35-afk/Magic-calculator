@@ -1,0 +1,24 @@
+kind = "mobile"
+previewPath = "/"
+title = "Calculator"
+description = "An offline-first mobile calculator with a discreet audience-number routine that can adjust the final operand to reveal a chosen result."
+version = "1.0.0"
+id = "artifacts/magical-calculator"
+router = "expo-domain"
+
+[[services]]
+name = "expo"
+ensurePreviewReachable = "/status"
+paths = [ "/" ]
+localPort = 22836
+
+[services.development]
+run = "pnpm --filter @workspace/magical-calculator run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/magical-calculator", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/magical-calculator", "run", "serve" ]
+
+[services.env]
+PORT = "22836"
+BASE_PATH = "/"
