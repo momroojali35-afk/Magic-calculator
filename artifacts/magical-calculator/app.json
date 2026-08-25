@@ -1,6 +1,7 @@
 {
   "expo": {
     "name": "Calculator",
+    "owner": "mufasels-team",
     "slug": "magical-calculator",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -12,6 +13,7 @@
       "supportsTablet": false
     },
     "android": {
+      "package": "com.mufasels.magicalcalculator",
       "resizeableActivity": true
     },
     "web": {
@@ -30,6 +32,11 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "b2281882-b1b1-42a0-94db-8fce6734592a"
+      }
     }
   }
 }
