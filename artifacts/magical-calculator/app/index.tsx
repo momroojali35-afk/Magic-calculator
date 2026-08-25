@@ -66,7 +66,7 @@ function Key({ label, tone = 'number', onPress, icon, testID }: { label: string;
   const colors = useColors();
   const { width } = useWindowDimensions();
   const scale = useRef(new Animated.Value(1)).current;
-  const buttonSize = Math.min(76, Math.max(60, (width - 76) / 4));
+  const buttonSize = Math.min(84, Math.max(68, (width - 64) / 4));
   const bg = tone === 'equals' ? colors.primary : tone === 'utility' || tone === 'operator' ? colors.secondary : colors.numberButton;
   const fg = tone === 'equals' ? colors.primaryForeground : tone === 'utility' || tone === 'operator' ? colors.primary : colors.foreground;
   return <Animated.View style={{ transform: [{ scale }] }}>
