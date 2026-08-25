@@ -26,6 +26,7 @@ function calculate(a: number, b: number, op: Operator) {
 }
 
 function evaluateExpression(expression: string) {
+  if (/^[+-]/.test(expression)) expression = `0${expression}`;
   const tokens = expression.match(/(?:\d+\.?\d*|\.\d+|[+\-×÷])/g) ?? [];
   const values: number[] = [];
   const operators: Operator[] = [];
@@ -159,6 +160,9 @@ export default function CalculatorScreen() {
   const [currencyAmount, setCurrencyAmount] = useState('1');
   const [currencyFrom, setCurrencyFrom] = useState('USD');
   const [currencyTo, setCurrencyTo] = useState('INR');
+  const [liveRates, setLiveRates] = useState<Record<string, number>>({ USD: 1, EUR: 0.92, GBP: 0.78, INR: 83.5, JPY: 150.2 });
+  const [ratesLoading, setRatesLoading] = useState(false);
+  const [ratesUpdatedAt, setRatesUpdatedAt] = useState('');
   const percentTaps = useRef<number[]>([]);
   const revealScale = useRef(new Animated.Value(1)).current;
   const displayScrollRef = useRef<ScrollView>(null);
@@ -171,6 +175,21 @@ export default function CalculatorScreen() {
       })
       .catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    if (toolPanel !== 'currency') return;
+    setRatesLoading(true);
+    fetch('https://open.er-api.com/v6/latest/USD')
+      .then((response) => response.json())
+      .then((data) => {
+        if (data?.result === 'success' && data.rates) {
+          setLiveRates({ USD: 1, EUR: data.rates.EUR, GBP: data.rates.GBP, INR: data.rates.INR, JPY: data.rates.JPY });
+          setRatesUpdatedAt(new Date().toLocaleTimeString());
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => setRatesLoading(false));
+  }, [toolPanel]);
 
   const saveSoundPreference = (enabled: boolean) => {
     setSoundEnabled(enabled);
@@ -206,7 +225,7 @@ export default function CalculatorScreen() {
       setAudienceEqualsPresses(0);
       setAudienceInputActive(true);
     } else {
-      setDisplay((value) => hasResult || value === '0' ? digit : value + digit);
+      setDisplay((value) => hasResult || value === '0' ? digit : value === '-' || value === '+' ? value + digit : value + digit);
     }
     setLastExpression('');
     setHasResult(false);
@@ -220,11 +239,17 @@ export default function CalculatorScreen() {
       setAudienceEqualsPresses(0);
       setAudienceInputActive(true);
     } else if (hasResult) setDisplay('0.');
+    else if (display === '-' || display === '+') setDisplay((value) => `${value}0.`);
     else if (!currentNumber.includes('.')) setDisplay((value) => `${value}.`);
     setLastExpression('');
     setHasResult(false);
   };
   const handleOperator = (nextOperator: Operator) => {
+    if (!hasResult && display === '0' && (nextOperator === '+' || nextOperator === '-')) {
+      setDisplay(nextOperator);
+      setLastExpression('');
+      return;
+    }
     if (hasResult) {
       const audienceOperator = config?.enabled && config.routineType === 'audience-number' && audienceBaseResult !== null
         ? config.triggerOperator === '-' ? '-' : '+'
@@ -331,12 +356,11 @@ export default function CalculatorScreen() {
   const backspace = () => { setLastExpression(''); setHasResult(false); setDisplay((value) => value.length > 1 ? value.slice(0, -1) : '0'); };
   const toggleSign = () => { setLastExpression(''); setHasResult(false); setDisplay((value) => value.replace(/(\d*\.?\d+)$/, (number) => `${Number(number) * -1}`)); };
   const showAudienceExpression = config?.routineType === 'audience-number' && lastExpression.length > 0;
-  const currencyRates: Record<string, number> = { USD: 1, EUR: 0.92, GBP: 0.78, INR: 83.5, JPY: 150.2 };
-  const convertedCurrency = (Number(currencyAmount) || 0) * currencyRates[currencyTo] / currencyRates[currencyFrom];
+  const convertedCurrency = (Number(currencyAmount) || 0) * liveRates[currencyTo] / liveRates[currencyFrom];
   const applyScientific = (operation: string) => {
     const value = Number(display);
     if (!Number.isFinite(value)) return;
-    const result = operation === 'sqrt' ? Math.sqrt(value) : operation === 'square' ? value * value : operation === 'sin' ? Math.sin(value * Math.PI / 180) : Math.cos(value * Math.PI / 180);
+    const result = operation === 'sqrt' ? Math.sqrt(value) : operation === 'square' ? value * value : operation === 'cube' ? value ** 3 : operation === 'reciprocal' ? 1 / value : operation === 'sin' ? Math.sin(value * Math.PI / 180) : operation === 'cos' ? Math.cos(value * Math.PI / 180) : operation === 'tan' ? Math.tan(value * Math.PI / 180) : operation === 'sinh' ? Math.sinh(value) : operation === 'cosh' ? Math.cosh(value) : operation === 'tanh' ? Math.tanh(value) : operation === 'ln' ? Math.log(value) : operation === 'log' ? Math.log10(value) : operation === 'exp' ? Math.exp(value) : operation === 'factorial' ? Array.from({ length: Math.max(0, Math.floor(value)) }, (_, index) => index + 1).reduce((total, item) => total * item, 1) : operation === 'pi' ? Math.PI : operation === 'random' ? Math.random() : value;
     setLastExpression(`${operation}(${display})`);
     setDisplay(formatNumber(result));
     setHasResult(true);
@@ -377,9 +401,9 @@ export default function CalculatorScreen() {
        <View style={styles.modalBackdrop}><Pressable style={StyleSheet.absoluteFill} onPress={() => setToolPanel(null)} />
          <View style={[styles.toolSheet, { backgroundColor: colors.card }]}>
            <View style={styles.sheetHeader}><Text style={[styles.sheetTitle, { color: colors.foreground }]}>{toolPanel === 'history' ? 'History' : toolPanel === 'scientific' ? 'Scientific' : 'Currency converter'}</Text><Pressable onPress={() => setToolPanel(null)} style={styles.closeButton}><Ionicons name="close" size={22} color={colors.mutedForeground} /></Pressable></View>
-           {toolPanel === 'history' && <ScrollView contentContainerStyle={styles.panelContent}>{calculationHistory.length === 0 ? <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Your calculations will appear here.</Text> : calculationHistory.map((item) => <Pressable key={item.id} onPress={() => { setDisplay(item.result); setHasResult(true); setToolPanel(null); }} style={[styles.historyRow, { borderBottomColor: colors.border }]}><Text style={[styles.historyExpression, { color: colors.mutedForeground }]}>{item.expression}</Text><Text style={[styles.historyResult, { color: colors.foreground }]}>= {item.result}</Text></Pressable>)}</ScrollView>}
-           {toolPanel === 'scientific' && <View style={styles.panelContent}><Text style={[styles.panelHint, { color: colors.mutedForeground }]}>Use degrees for trigonometric functions.</Text><View style={styles.scienceGrid}>{[['sin', 'sin'], ['cos', 'cos'], ['√', 'sqrt'], ['x²', 'square']].map(([label, operation]) => <Pressable key={operation} onPress={() => applyScientific(operation)} style={[styles.scienceButton, { backgroundColor: colors.secondary }]}><Text style={[styles.scienceText, { color: colors.primary }]}>{label}</Text></Pressable>)}</View></View>}
-           {toolPanel === 'currency' && <View style={styles.panelContent}><Text style={[styles.panelHint, { color: colors.mutedForeground }]}>Quick conversion using built-in reference rates.</Text><TextInput value={currencyAmount} onChangeText={setCurrencyAmount} keyboardType="decimal-pad" style={[styles.input, { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.secondary }]} /><View style={styles.currencyRow}>{['USD', 'EUR', 'GBP', 'INR', 'JPY'].map((code) => <Pressable key={code} onPress={() => setCurrencyFrom(code)} style={[styles.currencyChip, { backgroundColor: currencyFrom === code ? colors.primary : colors.secondary }]}><Text style={{ color: currencyFrom === code ? colors.primaryForeground : colors.foreground }}>{code}</Text></Pressable>)}</View><Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Convert to</Text><View style={styles.currencyRow}>{['USD', 'EUR', 'GBP', 'INR', 'JPY'].map((code) => <Pressable key={code} onPress={() => setCurrencyTo(code)} style={[styles.currencyChip, { backgroundColor: currencyTo === code ? colors.primary : colors.secondary }]}><Text style={{ color: currencyTo === code ? colors.primaryForeground : colors.foreground }}>{code}</Text></Pressable>)}</View><Text style={[styles.conversionResult, { color: colors.foreground }]}>{formatNumber(convertedCurrency)} {currencyTo}</Text></View>}
+           {toolPanel === 'history' && <ScrollView contentContainerStyle={styles.panelContent}>{calculationHistory.length === 0 ? <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Your calculations will appear here.</Text> : calculationHistory.map((item) => <Pressable key={item.id} onPress={() => { setDisplay(item.result); setHasResult(true); setToolPanel(null); }} style={[styles.historyRow, { borderBottomColor: colors.border }]}><Text style={[styles.historyExpression, { color: colors.mutedForeground }]}>{item.expression}</Text><Text style={[styles.historyResult, { color: colors.foreground }]}>= {item.result}</Text></Pressable>)}{calculationHistory.length > 0 && <Pressable onPress={() => { setCalculationHistory([]); AsyncStorage.removeItem('@magical-calculator/calculations'); }} style={[styles.clearHistoryButton, { borderColor: colors.destructive }]}><Text style={[styles.clearHistoryText, { color: colors.destructive }]}>Clear history</Text></Pressable>}</ScrollView>}
+           {toolPanel === 'scientific' && <ScrollView contentContainerStyle={styles.panelContent}><Text style={[styles.panelHint, { color: colors.mutedForeground }]}>Scientific functions use the current display value. Trigonometry uses degrees.</Text><View style={styles.scienceGrid}>{[['2nd', 'second'], ['(', 'open'], [')', 'close'], ['10ˣ', 'tenPower'], ['1/x', 'reciprocal'], ['x²', 'square'], ['x³', 'cube'], ['xʸ', 'power'], ['x!', 'factorial'], ['√', 'sqrt'], ['ʸ√x', 'root'], ['lg', 'log'], ['sin', 'sin'], ['cos', 'cos'], ['tan', 'tan'], ['ln', 'ln'], ['sinh', 'sinh'], ['cosh', 'cosh'], ['tanh', 'tanh'], ['eˣ', 'exp'], ['Rad', 'rad'], ['π', 'pi'], ['EE', 'ee'], ['Rand', 'random']].map(([label, operation]) => <Pressable key={operation} onPress={() => applyScientific(operation)} style={[styles.scienceButton, { backgroundColor: colors.secondary }]}><Text style={[styles.scienceText, { color: colors.foreground }]}>{label}</Text></Pressable>)}</View><View style={styles.memoryRow}>{['mc', 'm+', 'm−', 'mr'].map((label) => <Pressable key={label} style={[styles.memoryButton, { backgroundColor: colors.secondary }]}><Text style={[styles.scienceText, { color: colors.foreground }]}>{label}</Text></Pressable>)}</View></ScrollView>}
+           {toolPanel === 'currency' && <View style={styles.panelContent}><Text style={[styles.panelHint, { color: colors.mutedForeground }]}>{ratesLoading ? 'Updating live exchange rates…' : `Live rates${ratesUpdatedAt ? ` · updated ${ratesUpdatedAt}` : ''}`}</Text><TextInput value={currencyAmount} onChangeText={setCurrencyAmount} keyboardType="decimal-pad" style={[styles.input, { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.secondary }]} /><View style={styles.currencyRow}>{['USD', 'EUR', 'GBP', 'INR', 'JPY'].map((code) => <Pressable key={code} onPress={() => setCurrencyFrom(code)} style={[styles.currencyChip, { backgroundColor: currencyFrom === code ? colors.primary : colors.secondary }]}><Text style={{ color: currencyFrom === code ? colors.primaryForeground : colors.foreground }}>{code}</Text></Pressable>)}</View><Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Convert to</Text><View style={styles.currencyRow}>{['USD', 'EUR', 'GBP', 'INR', 'JPY'].map((code) => <Pressable key={code} onPress={() => setCurrencyTo(code)} style={[styles.currencyChip, { backgroundColor: currencyTo === code ? colors.primary : colors.secondary }]}><Text style={{ color: currencyTo === code ? colors.primaryForeground : colors.foreground }}>{code}</Text></Pressable>)}</View><Text style={[styles.conversionResult, { color: colors.foreground }]}>{formatNumber(convertedCurrency)} {currencyTo}</Text></View>}
          </View>
        </View>
      </Modal>
@@ -445,6 +469,10 @@ const styles = StyleSheet.create({
   scienceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   scienceButton: { width: '47%', minHeight: 58, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   scienceText: { fontFamily: 'Inter_600SemiBold', fontSize: 20 },
+  memoryRow: { flexDirection: 'row', gap: 12, marginTop: 18 },
+  memoryButton: { flex: 1, minHeight: 58, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  clearHistoryButton: { minHeight: 48, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginTop: 12 },
+  clearHistoryText: { fontFamily: 'Inter_600SemiBold', fontSize: 14 },
   currencyRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   currencyChip: { paddingHorizontal: 13, paddingVertical: 10, borderRadius: 14 },
   conversionResult: { fontFamily: 'Inter_700Bold', fontSize: 28, textAlign: 'center', marginTop: 16 },
