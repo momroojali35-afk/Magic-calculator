@@ -163,6 +163,8 @@ export default function CalculatorScreen() {
   const [liveRates, setLiveRates] = useState<Record<string, number>>({ USD: 1, EUR: 0.92, GBP: 0.78, INR: 83.5, JPY: 150.2 });
   const [ratesLoading, setRatesLoading] = useState(false);
   const [ratesUpdatedAt, setRatesUpdatedAt] = useState('');
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const drawerX = useRef(new Animated.Value(290)).current;
   const percentTaps = useRef<number[]>([]);
   const revealScale = useRef(new Animated.Value(1)).current;
   const displayScrollRef = useRef<ScrollView>(null);
@@ -190,6 +192,10 @@ export default function CalculatorScreen() {
       .catch(() => undefined)
       .finally(() => setRatesLoading(false));
   }, [toolPanel]);
+
+  useEffect(() => {
+    Animated.spring(drawerX, { toValue: drawerOpen ? 0 : 290, useNativeDriver: true, bounciness: 3 }).start();
+  }, [drawerOpen, drawerX]);
 
   const saveSoundPreference = (enabled: boolean) => {
     setSoundEnabled(enabled);
@@ -411,6 +417,15 @@ export default function CalculatorScreen() {
        <View style={styles.modalBackdrop}><Pressable style={StyleSheet.absoluteFill} onPress={() => setSettingsVisible(false)} /><View style={[styles.toolSheet, { backgroundColor: colors.card }]}><View style={styles.sheetHeader}><Text style={[styles.sheetTitle, { color: colors.foreground }]}>Settings</Text><Pressable onPress={() => setSettingsVisible(false)} style={styles.closeButton}><Ionicons name="close" size={22} color={colors.mutedForeground} /></Pressable></View><View style={[styles.settingRow, { borderColor: colors.border }]}><View><Text style={[styles.toggleTitle, { color: colors.foreground }]}>Sound</Text><Text style={[styles.toggleSub, { color: colors.mutedForeground }]}>Button feedback sound</Text></View><Switch value={soundEnabled} onValueChange={saveSoundPreference} trackColor={{ false: colors.border, true: colors.primary }} thumbColor={colors.card} /></View></View></View>
      </Modal>
     <MagicSheet visible={showMagic} onClose={() => setShowMagic(false)} />
+     <Pressable accessibilityLabel="Open calculator slide bar" onPress={() => setDrawerOpen(true)} style={[styles.drawerHandle, { backgroundColor: colors.primary }]}><Feather name="chevron-left" size={20} color={colors.primaryForeground} /></Pressable>
+     <Animated.View pointerEvents={drawerOpen ? 'auto' : 'none'} style={[styles.drawer, { backgroundColor: colors.card, transform: [{ translateX: drawerX }], shadowColor: colors.foreground }]}>
+       <View style={styles.drawerHeader}><Text style={[styles.drawerTitle, { color: colors.foreground }]}>Quick tools</Text><Pressable accessibilityLabel="Close calculator slide bar" onPress={() => setDrawerOpen(false)} style={styles.closeButton}><Ionicons name="close" size={22} color={colors.mutedForeground} /></Pressable></View>
+       <Text style={[styles.drawerHint, { color: colors.mutedForeground }]}>Slide-out calculator shortcuts</Text>
+       <Pressable onPress={() => { setDrawerOpen(false); setToolPanel('history'); }} style={[styles.drawerItem, { backgroundColor: colors.secondary }]}><Feather name="clock" size={22} color={colors.primary} /><Text style={[styles.drawerItemText, { color: colors.foreground }]}>History</Text><Feather name="chevron-right" size={18} color={colors.mutedForeground} /></Pressable>
+       <Pressable onPress={() => { setDrawerOpen(false); setToolPanel('scientific'); }} style={[styles.drawerItem, { backgroundColor: colors.secondary }]}><MaterialCommunityIcons name="function-variant" size={23} color={colors.primary} /><Text style={[styles.drawerItemText, { color: colors.foreground }]}>Scientific</Text><Feather name="chevron-right" size={18} color={colors.mutedForeground} /></Pressable>
+       <Pressable onPress={() => { setDrawerOpen(false); setToolPanel('currency'); }} style={[styles.drawerItem, { backgroundColor: colors.secondary }]}><MaterialCommunityIcons name="currency-usd" size={23} color={colors.primary} /><Text style={[styles.drawerItemText, { color: colors.foreground }]}>Exchange rates</Text><Feather name="chevron-right" size={18} color={colors.mutedForeground} /></Pressable>
+       <Pressable onPress={() => { setDrawerOpen(false); setSettingsVisible(true); }} style={[styles.drawerItem, { backgroundColor: colors.secondary }]}><Feather name="settings" size={22} color={colors.primary} /><Text style={[styles.drawerItemText, { color: colors.foreground }]}>Settings</Text><Feather name="chevron-right" size={18} color={colors.mutedForeground} /></Pressable>
+     </Animated.View>
   </View>;
 }
 
@@ -421,6 +436,13 @@ const styles = StyleSheet.create({
   topBar: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   appTitle: { fontFamily: 'Inter_700Bold', fontSize: 20, letterSpacing: -0.5 },
   iconButton: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
+  drawerHandle: { position: 'absolute', right: 0, top: '48%', width: 30, height: 58, borderTopLeftRadius: 18, borderBottomLeftRadius: 18, alignItems: 'center', justifyContent: 'center', zIndex: 20 },
+  drawer: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 290, paddingHorizontal: 18, paddingTop: 54, zIndex: 30, shadowOffset: { width: -5, height: 0 }, shadowOpacity: 0.18, shadowRadius: 20, elevation: 12 },
+  drawerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  drawerTitle: { fontFamily: 'Inter_700Bold', fontSize: 22 },
+  drawerHint: { fontFamily: 'Inter_400Regular', fontSize: 12, marginTop: 5, marginBottom: 22 },
+  drawerItem: { minHeight: 58, borderRadius: 16, paddingHorizontal: 15, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
+  drawerItemText: { flex: 1, fontFamily: 'Inter_600SemiBold', fontSize: 14 },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   loadingDot: { width: 12, height: 12, borderRadius: 6 },
   displayWrap: { flex: 1, minHeight: 220, justifyContent: 'flex-end', alignItems: 'flex-end', paddingBottom: 30 },
