@@ -52,6 +52,45 @@ const colors = {
     input: '#DDE4F1',
   },
 
+  dark: {
+    // Legacy aliases
+    text: '#F4F6FA',
+    tint: '#9BB2FF',
+
+    // Core surfaces
+    background: '#11141B',
+    foreground: '#F4F6FA',
+
+    // Cards / elevated surfaces
+    card: '#1B202B',
+    cardForeground: '#F4F6FA',
+    numberButton: '#252B38',
+
+    // Primary action color (buttons, links, active states)
+    primary: '#9BB2FF',
+    primaryForeground: '#111827',
+
+    // Secondary / less-emphasis interactive surfaces
+    secondary: '#2A3140',
+    secondaryForeground: '#DCE3F5',
+
+    // Muted / subdued elements
+    muted: '#333B4C',
+    mutedForeground: '#A7B1C6',
+
+    // Accent highlights
+    accent: '#2E3C68',
+    accentForeground: '#C8D5FF',
+
+    // Destructive actions
+    destructive: '#FF8C99',
+    destructiveForeground: '#241218',
+
+    // Borders and input outlines
+    border: '#3B4558',
+    input: '#3B4558',
+  },
+
   // Border radius (in px). Sync from the sibling web artifact's --radius
   // CSS variable. This value applies to cards, buttons, inputs, and modals.
   radius: 22,
