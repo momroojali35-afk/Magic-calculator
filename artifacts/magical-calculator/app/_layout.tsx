@@ -5,6 +5,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ThemeProvider } from '@/hooks/useColors';
+import * as SplashScreen from 'expo-splash-screen';
 import {
   Inter_400Regular,
   Inter_500Medium,
@@ -18,6 +19,10 @@ import { MagicProvider } from '@/context/MagicContext';
 
 const queryClient = new QueryClient();
 
+// Render the calculator immediately instead of holding the native launch
+// screen while the optional Inter font files load.
+SplashScreen.preventAutoHideAsync().catch(() => undefined);
+
 function RootLayoutNav() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
@@ -27,15 +32,16 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
-  const [fontsLoaded, fontError] = useFonts({
+  useFonts({
     Inter_400Regular,
     Inter_500Medium,
     Inter_600SemiBold,
     Inter_700Bold,
   });
 
-
-  if (!fontsLoaded && !fontError) return null;
+  React.useEffect(() => {
+    SplashScreen.hideAsync().catch(() => undefined);
+  }, []);
 
   return (
     <SafeAreaProvider>
