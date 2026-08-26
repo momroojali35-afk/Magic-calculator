@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Calculator",
-    "owner": "mufasels-team",
+    "owner": "momroojs-team",
     "slug": "magical-calculator",
     "version": "1.0.0",
     "orientation": "default",
@@ -44,7 +44,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "b2281882-b1b1-42a0-94db-8fce6734592a"
+        "projectId": "4ea7276a-b333-4d4c-872e-85d9011d531c"
       }
     }
   }
