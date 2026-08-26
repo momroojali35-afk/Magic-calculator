@@ -85,16 +85,23 @@ function getNextBracket(expression: string): '(' | ')' {
   return '(';
 }
 
+function getKeypadMetrics(width: number) {
+  const horizontalPadding = Math.min(20, Math.max(12, width * 0.05));
+  const gap = Math.min(12, Math.max(6, width * 0.03));
+  const keySize = Math.min(84, Math.max(44, (width - horizontalPadding * 2 - gap * 3) / 4));
+  return { horizontalPadding, gap, keySize };
+}
+
 function Key({ label, tone = 'number', onPress, icon, testID }: { label: string; tone?: 'number' | 'utility' | 'operator' | 'equals'; onPress: () => void; icon?: React.ReactNode; testID?: string }) {
   const colors = useColors();
   const { width } = useWindowDimensions();
   const scale = useRef(new Animated.Value(1)).current;
-  const buttonSize = Math.min(84, Math.max(68, (width - 64) / 4));
+  const { keySize: buttonSize } = getKeypadMetrics(width);
   const bg = tone === 'equals' ? colors.primary : tone === 'utility' || tone === 'operator' ? colors.secondary : colors.numberButton;
   const fg = tone === 'equals' ? colors.primaryForeground : tone === 'utility' || tone === 'operator' ? colors.primary : colors.foreground;
   return <Animated.View style={{ transform: [{ scale }] }}>
     <Pressable testID={testID} onPressIn={() => Animated.spring(scale, { toValue: 0.91, useNativeDriver: true, speed: 30 }).start()} onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: true }).start()} onPress={() => { Haptics.selectionAsync(); onPress(); }} style={[styles.key, { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2, backgroundColor: bg, shadowColor: colors.foreground }]}>
-      {icon ?? <Text style={[styles.keyText, { color: fg }]}>{label}</Text>}
+      {icon ?? <Text numberOfLines={1} allowFontScaling={false} maxFontSizeMultiplier={1} adjustsFontSizeToFit style={[styles.keyText, { color: fg }]}>{label}</Text>}
     </Pressable>
   </Animated.View>;
 }
@@ -168,6 +175,7 @@ export default function CalculatorScreen() {
   const colors = useColors();
   const { theme, setTheme } = useTheme();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const { config, isLoaded, countOperation, finishReveal, resetCounter } = useMagic();
   const [display, setDisplay] = useState('0');
   const [hasResult, setHasResult] = useState(false);
@@ -406,8 +414,9 @@ export default function CalculatorScreen() {
     addToHistory(`${operation}(${display})`, formatNumber(result));
     setToolPanel(null);
   };
+  const keypadMetrics = getKeypadMetrics(width);
   if (!isLoaded) return <View style={[styles.loading, { backgroundColor: colors.background }]}><ActivityIndicator color={colors.primary} /></View>;
-  return <View style={[styles.container, { backgroundColor: colors.background, paddingTop: Math.max(insets.top, Platform.OS === 'web' ? 67 : 0), paddingBottom: Math.max(insets.bottom, Platform.OS === 'web' ? 34 : 14) }]}>
+  return <View style={[styles.container, { backgroundColor: colors.background, paddingHorizontal: keypadMetrics.horizontalPadding, paddingTop: Math.max(insets.top, Platform.OS === 'web' ? 67 : 0), paddingBottom: Math.max(insets.bottom, Platform.OS === 'web' ? 34 : 14) }]}>
      <StatusBar barStyle={theme === 'dark' ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
       <View style={styles.topBar}>
         <Pressable accessibilityLabel="Settings" onPress={() => setSettingsVisible(true)} style={styles.iconButton}><Feather name="settings" size={22} color={colors.foreground} /></Pressable>
@@ -429,12 +438,12 @@ export default function CalculatorScreen() {
         <Pressable accessibilityLabel="Scientific calculator" onPress={() => setToolPanel('scientific')} style={styles.toolButton}><Text style={[styles.toolGlyph, { color: colors.foreground }]}>fₓ</Text></Pressable>
         <Pressable accessibilityLabel="Currency converter" onPress={() => setToolPanel('currency')} style={styles.toolButton}><Text style={[styles.toolGlyph, { color: colors.foreground }]}>$</Text></Pressable>
      </View>
-     <View style={styles.keypad}>
-       <View style={styles.row}><Key label="AC" tone="utility" onPress={clear} testID="clear" /><Key label="()" tone="utility" onPress={() => handleBracket(getNextBracket(display))} /><Key label="%" tone="utility" onPress={tapPercent} testID="percent" /><Key label="÷" tone="operator" onPress={() => handleOperator('÷')} /></View>
-      <View style={styles.row}><Key label="7" onPress={() => handleDigit('7')} /><Key label="8" onPress={() => handleDigit('8')} /><Key label="9" onPress={() => handleDigit('9')} /><Key label="×" tone="operator" onPress={() => handleOperator('×')} /></View>
-      <View style={styles.row}><Key label="4" onPress={() => handleDigit('4')} /><Key label="5" onPress={() => handleDigit('5')} /><Key label="6" onPress={() => handleDigit('6')} /><Key label="−" tone="operator" onPress={() => handleOperator('-')} /></View>
-      <View style={styles.row}><Key label="1" onPress={() => handleDigit('1')} /><Key label="2" onPress={() => handleDigit('2')} /><Key label="3" onPress={() => handleDigit('3')} /><Key label="+" tone="operator" onPress={() => handleOperator('+')} /></View>
-      <View style={styles.row}><Key label="⌫" tone="utility" onPress={backspace} icon={<Feather name="delete" size={23} color={colors.primary} />} /><Key label="0" onPress={() => handleDigit('0')} /><Key label="." onPress={handleDecimal} /><Key label="=" tone="equals" onPress={handleEquals} testID="equals" /></View>
+     <View style={[styles.keypad, { gap: keypadMetrics.gap }]}>
+       <View style={[styles.row, { gap: keypadMetrics.gap }]}><Key label="AC" tone="utility" onPress={clear} testID="clear" /><Key label="()" tone="utility" onPress={() => handleBracket(getNextBracket(display))} /><Key label="%" tone="utility" onPress={tapPercent} testID="percent" /><Key label="÷" tone="operator" onPress={() => handleOperator('÷')} /></View>
+      <View style={[styles.row, { gap: keypadMetrics.gap }]}><Key label="7" onPress={() => handleDigit('7')} /><Key label="8" onPress={() => handleDigit('8')} /><Key label="9" onPress={() => handleDigit('9')} /><Key label="×" tone="operator" onPress={() => handleOperator('×')} /></View>
+      <View style={[styles.row, { gap: keypadMetrics.gap }]}><Key label="4" onPress={() => handleDigit('4')} /><Key label="5" onPress={() => handleDigit('5')} /><Key label="6" onPress={() => handleDigit('6')} /><Key label="−" tone="operator" onPress={() => handleOperator('-')} /></View>
+      <View style={[styles.row, { gap: keypadMetrics.gap }]}><Key label="1" onPress={() => handleDigit('1')} /><Key label="2" onPress={() => handleDigit('2')} /><Key label="3" onPress={() => handleDigit('3')} /><Key label="+" tone="operator" onPress={() => handleOperator('+')} /></View>
+      <View style={[styles.row, { gap: keypadMetrics.gap }]}><Key label="⌫" tone="utility" onPress={backspace} icon={<Feather name="delete" size={23} color={colors.primary} />} /><Key label="0" onPress={() => handleDigit('0')} /><Key label="." onPress={handleDecimal} /><Key label="=" tone="equals" onPress={handleEquals} testID="equals" /></View>
     </View>
      <Modal visible={toolPanel !== null} animationType="slide" transparent onRequestClose={() => setToolPanel(null)}>
        <View style={styles.modalBackdrop}><Pressable style={StyleSheet.absoluteFill} onPress={() => setToolPanel(null)} />
