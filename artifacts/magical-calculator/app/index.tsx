@@ -409,10 +409,9 @@ export default function CalculatorScreen() {
   if (!isLoaded) return <View style={[styles.loading, { backgroundColor: colors.background }]}><ActivityIndicator color={colors.primary} /></View>;
   return <View style={[styles.container, { backgroundColor: colors.background, paddingTop: Math.max(insets.top, Platform.OS === 'web' ? 67 : 0), paddingBottom: Math.max(insets.bottom, Platform.OS === 'web' ? 34 : 14) }]}>
      <StatusBar barStyle={theme === 'dark' ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
-     <View style={styles.topBar}>
-       <Text style={[styles.appTitle, { color: colors.foreground }]}>Calculator</Text>
-       <Pressable accessibilityLabel="Settings" onPress={() => setSettingsVisible(true)} style={styles.iconButton}><Feather name="settings" size={22} color={colors.foreground} /></Pressable>
-     </View>
+      <View style={styles.topBar}>
+        <Pressable accessibilityLabel="Settings" onPress={() => setSettingsVisible(true)} style={styles.iconButton}><Feather name="settings" size={22} color={colors.foreground} /></Pressable>
+      </View>
     <View style={styles.displayWrap}>
       <ScrollView ref={displayScrollRef} horizontal showsHorizontalScrollIndicator={false} directionalLockEnabled contentContainerStyle={styles.displayScrollContent} style={styles.displayScroll} scrollEventThrottle={16}>
         {hasResult && showAudienceExpression ? (
@@ -426,9 +425,9 @@ export default function CalculatorScreen() {
       </ScrollView>
     </View>
      <View style={[styles.toolBar, { borderColor: colors.border }]}>
-       <Pressable accessibilityLabel="Calculation history" onPress={() => setToolPanel('history')} style={styles.toolButton}><Feather name="clock" size={22} color={colors.foreground} /></Pressable>
-       <Pressable accessibilityLabel="Scientific calculator" onPress={() => setToolPanel('scientific')} style={styles.toolButton}><MaterialCommunityIcons name="function-variant" size={23} color={colors.foreground} /></Pressable>
-       <Pressable accessibilityLabel="Currency converter" onPress={() => setToolPanel('currency')} style={styles.toolButton}><MaterialCommunityIcons name="currency-usd" size={23} color={colors.foreground} /></Pressable>
+        <Pressable accessibilityLabel="Calculation history" onPress={() => setToolPanel('history')} style={styles.toolButton}><MaterialCommunityIcons name="history" size={25} color={colors.foreground} /></Pressable>
+        <Pressable accessibilityLabel="Scientific calculator" onPress={() => setToolPanel('scientific')} style={styles.toolButton}><Text style={[styles.toolGlyph, { color: colors.foreground }]}>fₓ</Text></Pressable>
+        <Pressable accessibilityLabel="Currency converter" onPress={() => setToolPanel('currency')} style={styles.toolButton}><Text style={[styles.toolGlyph, { color: colors.foreground }]}>$</Text></Pressable>
      </View>
      <View style={styles.keypad}>
        <View style={styles.row}><Key label="AC" tone="utility" onPress={clear} testID="clear" /><Key label="()" tone="utility" onPress={() => handleBracket(getNextBracket(display))} /><Key label="%" tone="utility" onPress={tapPercent} testID="percent" /><Key label="÷" tone="operator" onPress={() => handleOperator('÷')} /></View>
@@ -458,8 +457,7 @@ function ActivityIndicator({ color }: { color: string }) { return <View style={[
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 20 },
-  topBar: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  appTitle: { fontFamily: 'Inter_700Bold', fontSize: 20, letterSpacing: -0.5 },
+  topBar: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' },
   iconButton: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   loadingDot: { width: 12, height: 12, borderRadius: 6 },
@@ -472,6 +470,7 @@ const styles = StyleSheet.create({
   keypad: { gap: 12 },
   toolBar: { flexDirection: 'row', alignItems: 'center', gap: 28, borderTopWidth: 1, paddingTop: 14, paddingBottom: 14, paddingHorizontal: 10 },
   toolButton: { width: 44, height: 38, alignItems: 'center', justifyContent: 'center' },
+  toolGlyph: { fontFamily: 'Inter_600SemiBold', fontSize: 23, lineHeight: 28 },
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
   key: { width: 70, height: 70, borderRadius: 35, alignItems: 'center', justifyContent: 'center', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 2 },
   keyText: { fontFamily: 'Inter_600SemiBold', fontSize: 23 },
