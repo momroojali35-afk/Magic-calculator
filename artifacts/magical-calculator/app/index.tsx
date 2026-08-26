@@ -3,10 +3,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Animated, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, useWindowDimensions, View,
+  Animated, Modal, Platform, Pressable, ScrollView, StatusBar, StyleSheet, Switch, Text, TextInput, useWindowDimensions, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useColors } from '@/hooks/useColors';
+import { useColors, useTheme } from '@/hooks/useColors';
 import { RevealType, RoutineType, TriggerMethod, useMagic } from '@/context/MagicContext';
 
 type Operator = '+' | '-' | '×' | '÷' | null;
@@ -73,6 +73,18 @@ function replaceFinalOperand(expression: string, operand: number) {
   return `${expression.slice(0, match.index)}${formatNumber(operand)}`;
 }
 
+function getNextBracket(expression: string): '(' | ')' {
+  const openCount = (expression.match(/\(/g) ?? []).length;
+  const closeCount = (expression.match(/\)/g) ?? []).length;
+  const endsWithOperatorOrOpen = /[+\-×÷(]$/.test(expression);
+
+  // Close the innermost open group whenever the current value can be closed.
+  // Otherwise start a new group, allowing expressions such as:
+  // (8×9)+(56+96)+(89+9)
+  if (openCount > closeCount && !endsWithOperatorOrOpen) return ')';
+  return '(';
+}
+
 function Key({ label, tone = 'number', onPress, icon, testID }: { label: string; tone?: 'number' | 'utility' | 'operator' | 'equals'; onPress: () => void; icon?: React.ReactNode; testID?: string }) {
   const colors = useColors();
   const { width } = useWindowDimensions();
@@ -127,8 +139,8 @@ function MagicSheet({ visible, onClose }: { visible: boolean; onClose: () => voi
     <View style={styles.modalBackdrop}>
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       <View style={[styles.sheet, { backgroundColor: colors.card, shadowColor: colors.foreground }]}>
-        <View style={styles.sheetHandle} />
-        <View style={styles.sheetHeader}><View><Text style={[styles.sheetEyebrow, { color: colors.primary }]}>PRIVATE ROUTINE</Text><Text style={[styles.sheetTitle, { color: colors.foreground }]}>Magic Set</Text></View><Pressable onPress={onClose} style={styles.closeButton}><Ionicons name="close" size={22} color={colors.mutedForeground} /></Pressable></View>
+         <View style={[styles.sheetHandle, { backgroundColor: colors.border }]} />
+         <View style={styles.sheetHeader}><View><Text style={[styles.sheetEyebrow, { color: colors.primary }]}>PRIVATE ROUTINE</Text><Text style={[styles.sheetTitle, { color: colors.foreground }]}>Magic Set</Text></View><Pressable onPress={onClose} style={[styles.closeButton, { backgroundColor: colors.secondary }]}><Ionicons name="close" size={22} color={colors.mutedForeground} /></Pressable></View>
         <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetContent}>
           <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Routine</Text>
           <Pressable onPress={() => cycle(routineType, ['standard', 'audience-number'], setRoutineType)} style={[styles.select, { borderColor: colors.border, backgroundColor: colors.secondary }]}><Text style={[styles.selectText, { color: colors.foreground }]}>{routineLabels[routineType]}</Text><Feather name="chevron-down" size={18} color={colors.mutedForeground} /></Pressable>
@@ -154,6 +166,7 @@ function MagicSheet({ visible, onClose }: { visible: boolean; onClose: () => voi
 
 export default function CalculatorScreen() {
   const colors = useColors();
+  const { theme, setTheme } = useTheme();
   const insets = useSafeAreaInsets();
   const { config, isLoaded, countOperation, finishReveal, resetCounter } = useMagic();
   const [display, setDisplay] = useState('0');
@@ -395,6 +408,7 @@ export default function CalculatorScreen() {
   };
   if (!isLoaded) return <View style={[styles.loading, { backgroundColor: colors.background }]}><ActivityIndicator color={colors.primary} /></View>;
   return <View style={[styles.container, { backgroundColor: colors.background, paddingTop: Math.max(insets.top, Platform.OS === 'web' ? 67 : 0), paddingBottom: Math.max(insets.bottom, Platform.OS === 'web' ? 34 : 14) }]}>
+     <StatusBar barStyle={theme === 'dark' ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
      <View style={styles.topBar}>
        <Text style={[styles.appTitle, { color: colors.foreground }]}>Calculator</Text>
        <Pressable accessibilityLabel="Settings" onPress={() => setSettingsVisible(true)} style={styles.iconButton}><Feather name="settings" size={22} color={colors.foreground} /></Pressable>
@@ -417,7 +431,7 @@ export default function CalculatorScreen() {
        <Pressable accessibilityLabel="Currency converter" onPress={() => setToolPanel('currency')} style={styles.toolButton}><MaterialCommunityIcons name="currency-usd" size={23} color={colors.foreground} /></Pressable>
      </View>
      <View style={styles.keypad}>
-      <View style={styles.row}><Key label="AC" tone="utility" onPress={clear} testID="clear" /><Key label="()" tone="utility" onPress={() => handleBracket(display.includes('(') && !display.endsWith(')') ? ')' : '(')} /><Key label="%" tone="utility" onPress={tapPercent} testID="percent" /><Key label="÷" tone="operator" onPress={() => handleOperator('÷')} /></View>
+       <View style={styles.row}><Key label="AC" tone="utility" onPress={clear} testID="clear" /><Key label="()" tone="utility" onPress={() => handleBracket(getNextBracket(display))} /><Key label="%" tone="utility" onPress={tapPercent} testID="percent" /><Key label="÷" tone="operator" onPress={() => handleOperator('÷')} /></View>
       <View style={styles.row}><Key label="7" onPress={() => handleDigit('7')} /><Key label="8" onPress={() => handleDigit('8')} /><Key label="9" onPress={() => handleDigit('9')} /><Key label="×" tone="operator" onPress={() => handleOperator('×')} /></View>
       <View style={styles.row}><Key label="4" onPress={() => handleDigit('4')} /><Key label="5" onPress={() => handleDigit('5')} /><Key label="6" onPress={() => handleDigit('6')} /><Key label="−" tone="operator" onPress={() => handleOperator('-')} /></View>
       <View style={styles.row}><Key label="1" onPress={() => handleDigit('1')} /><Key label="2" onPress={() => handleDigit('2')} /><Key label="3" onPress={() => handleDigit('3')} /><Key label="+" tone="operator" onPress={() => handleOperator('+')} /></View>
@@ -426,7 +440,7 @@ export default function CalculatorScreen() {
      <Modal visible={toolPanel !== null} animationType="slide" transparent onRequestClose={() => setToolPanel(null)}>
        <View style={styles.modalBackdrop}><Pressable style={StyleSheet.absoluteFill} onPress={() => setToolPanel(null)} />
          <View style={[styles.toolSheet, { backgroundColor: colors.card }]}>
-           <View style={styles.sheetHeader}><Text style={[styles.sheetTitle, { color: colors.foreground }]}>{toolPanel === 'history' ? 'History' : toolPanel === 'scientific' ? 'Scientific' : 'Currency converter'}</Text><Pressable onPress={() => setToolPanel(null)} style={styles.closeButton}><Ionicons name="close" size={22} color={colors.mutedForeground} /></Pressable></View>
+            <View style={styles.sheetHeader}><Text style={[styles.sheetTitle, { color: colors.foreground }]}>{toolPanel === 'history' ? 'History' : toolPanel === 'scientific' ? 'Scientific' : 'Currency converter'}</Text><Pressable onPress={() => setToolPanel(null)} style={[styles.closeButton, { backgroundColor: colors.secondary }]}><Ionicons name="close" size={22} color={colors.mutedForeground} /></Pressable></View>
            {toolPanel === 'history' && <ScrollView contentContainerStyle={styles.panelContent}>{calculationHistory.length === 0 ? <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Your calculations will appear here.</Text> : calculationHistory.map((item) => <Pressable key={item.id} onPress={() => { setDisplay(item.result); setHasResult(true); setToolPanel(null); }} style={[styles.historyRow, { borderBottomColor: colors.border }]}><Text style={[styles.historyExpression, { color: colors.mutedForeground }]}>{item.expression}</Text><Text style={[styles.historyResult, { color: colors.foreground }]}>= {item.result}</Text></Pressable>)}{calculationHistory.length > 0 && <Pressable onPress={() => { setCalculationHistory([]); AsyncStorage.removeItem('@magical-calculator/calculations'); }} style={[styles.clearHistoryButton, { borderColor: colors.destructive }]}><Text style={[styles.clearHistoryText, { color: colors.destructive }]}>Clear history</Text></Pressable>}</ScrollView>}
           {toolPanel === 'scientific' && <ScrollView contentContainerStyle={styles.panelContent}><Text style={[styles.panelHint, { color: colors.mutedForeground }]}>Scientific functions use the current display value. Trigonometry uses degrees.</Text><View style={styles.scienceGrid}>{[['2nd', 'second'], ['10ˣ', 'tenPower'], ['1/x', 'reciprocal'], ['x²', 'square'], ['x³', 'cube'], ['xʸ', 'power'], ['x!', 'factorial'], ['√', 'sqrt'], ['ʸ√x', 'root'], ['lg', 'log'], ['sin', 'sin'], ['cos', 'cos'], ['tan', 'tan'], ['ln', 'ln'], ['sinh', 'sinh'], ['cosh', 'cosh'], ['tanh', 'tanh'], ['eˣ', 'exp'], ['Rad', 'rad'], ['π', 'pi'], ['EE', 'ee'], ['Rand', 'random']].map(([label, operation]) => <Pressable key={operation} onPress={() => applyScientific(operation)} style={[styles.scienceButton, { backgroundColor: colors.secondary }]}><Text style={[styles.scienceText, { color: colors.foreground }]}>{label}</Text></Pressable>)}</View><View style={styles.memoryRow}>{['mc', 'm+', 'm−', 'mr'].map((label) => <Pressable key={label} style={[styles.memoryButton, { backgroundColor: colors.secondary }]}><Text style={[styles.scienceText, { color: colors.foreground }]}>{label}</Text></Pressable>)}</View></ScrollView>}
            {toolPanel === 'currency' && <View style={styles.panelContent}><Text style={[styles.panelHint, { color: colors.mutedForeground }]}>{ratesLoading ? 'Updating live exchange rates…' : `Live rates${ratesUpdatedAt ? ` · updated ${ratesUpdatedAt}` : ''}`}</Text><TextInput value={currencyAmount} onChangeText={setCurrencyAmount} keyboardType="decimal-pad" style={[styles.input, { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.secondary }]} /><View style={styles.currencyRow}>{['USD', 'EUR', 'GBP', 'INR', 'JPY'].map((code) => <Pressable key={code} onPress={() => setCurrencyFrom(code)} style={[styles.currencyChip, { backgroundColor: currencyFrom === code ? colors.primary : colors.secondary }]}><Text style={{ color: currencyFrom === code ? colors.primaryForeground : colors.foreground }}>{code}</Text></Pressable>)}</View><Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Convert to</Text><View style={styles.currencyRow}>{['USD', 'EUR', 'GBP', 'INR', 'JPY'].map((code) => <Pressable key={code} onPress={() => setCurrencyTo(code)} style={[styles.currencyChip, { backgroundColor: currencyTo === code ? colors.primary : colors.secondary }]}><Text style={{ color: currencyTo === code ? colors.primaryForeground : colors.foreground }}>{code}</Text></Pressable>)}</View><Text style={[styles.conversionResult, { color: colors.foreground }]}>{formatNumber(convertedCurrency)} {currencyTo}</Text></View>}
@@ -434,7 +448,7 @@ export default function CalculatorScreen() {
        </View>
      </Modal>
      <Modal visible={settingsVisible} animationType="slide" transparent onRequestClose={() => setSettingsVisible(false)}>
-       <View style={styles.modalBackdrop}><Pressable style={StyleSheet.absoluteFill} onPress={() => setSettingsVisible(false)} /><View style={[styles.toolSheet, { backgroundColor: colors.card }]}><View style={styles.sheetHeader}><Text style={[styles.sheetTitle, { color: colors.foreground }]}>Settings</Text><Pressable onPress={() => setSettingsVisible(false)} style={styles.closeButton}><Ionicons name="close" size={22} color={colors.mutedForeground} /></Pressable></View><View style={[styles.settingRow, { borderColor: colors.border }]}><View><Text style={[styles.toggleTitle, { color: colors.foreground }]}>Sound</Text><Text style={[styles.toggleSub, { color: colors.mutedForeground }]}>Button feedback sound</Text></View><Switch value={soundEnabled} onValueChange={saveSoundPreference} trackColor={{ false: colors.border, true: colors.primary }} thumbColor={colors.card} /></View></View></View>
+        <View style={styles.modalBackdrop}><Pressable style={StyleSheet.absoluteFill} onPress={() => setSettingsVisible(false)} /><View style={[styles.toolSheet, { backgroundColor: colors.card }]}><View style={styles.sheetHeader}><Text style={[styles.sheetTitle, { color: colors.foreground }]}>Settings</Text><Pressable onPress={() => setSettingsVisible(false)} style={[styles.closeButton, { backgroundColor: colors.secondary }]}><Ionicons name="close" size={22} color={colors.mutedForeground} /></Pressable></View><View style={[styles.settingRow, { borderColor: colors.border }]}><View><Text style={[styles.toggleTitle, { color: colors.foreground }]}>Sound</Text><Text style={[styles.toggleSub, { color: colors.mutedForeground }]}>Button feedback sound</Text></View><Switch value={soundEnabled} onValueChange={saveSoundPreference} trackColor={{ false: colors.border, true: colors.primary }} thumbColor={colors.card} /></View><View style={[styles.themeRow, { borderColor: colors.border }]}><View><Text style={[styles.toggleTitle, { color: colors.foreground }]}>Theme</Text><Text style={[styles.toggleSub, { color: colors.mutedForeground }]}>{theme === 'light' ? 'Light appearance' : 'Dark appearance'}</Text></View><View style={[styles.themeChoices, { backgroundColor: colors.secondary }]}>{(['light', 'dark'] as const).map((mode) => <Pressable key={mode} accessibilityRole="button" onPress={() => setTheme(mode)} style={[styles.themeChoice, { backgroundColor: theme === mode ? colors.primary : 'transparent' }]}><Text style={[styles.themeChoiceText, { color: theme === mode ? colors.primaryForeground : colors.foreground }]}>{mode === 'light' ? 'Light' : 'Dark'}</Text></Pressable>)}</View></View></View></View>
      </Modal>
     <MagicSheet visible={showMagic} onClose={() => setShowMagic(false)} />
   </View>;
@@ -503,6 +517,10 @@ const styles = StyleSheet.create({
   currencyChip: { paddingHorizontal: 13, paddingVertical: 10, borderRadius: 14 },
   conversionResult: { fontFamily: 'Inter_700Bold', fontSize: 28, textAlign: 'center', marginTop: 16 },
   settingRow: { marginHorizontal: 24, marginTop: 22, paddingVertical: 16, borderTopWidth: 1, borderBottomWidth: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  themeRow: { marginHorizontal: 24, paddingVertical: 16, borderBottomWidth: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 16 },
+  themeChoices: { flexDirection: 'row', borderRadius: 12, padding: 3 },
+  themeChoice: { minWidth: 58, minHeight: 36, paddingHorizontal: 10, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  themeChoiceText: { fontFamily: 'Inter_600SemiBold', fontSize: 12 },
   cancelButton: { flex: 1, minHeight: 52, borderWidth: 1, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   cancelText: { fontFamily: 'Inter_600SemiBold', fontSize: 14 },
   activateButton: { flex: 1.5, minHeight: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
