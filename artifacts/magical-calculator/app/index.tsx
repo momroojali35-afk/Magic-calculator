@@ -26,28 +26,39 @@ function calculate(a: number, b: number, op: Operator) {
 }
 
 function evaluateExpression(expression: string) {
-  if (/^[+-]/.test(expression)) expression = `0${expression}`;
-  const tokens = expression.match(/(?:\d+\.?\d*|\.\d+|[+\-×÷])/g) ?? [];
+  const tokens = expression.replace(/−/g, '-').match(/(?:\d+\.?\d*|\.\d+|[()+\-×÷])/g) ?? [];
   const values: number[] = [];
-  const operators: Operator[] = [];
+  const operators: Array<Operator | '('> = [];
   const applyTop = () => {
     const op = operators.pop();
-    if (!op) return;
+    if (!op || op === '(') return;
     const right = values.pop() ?? 0;
     const left = values.pop() ?? 0;
     values.push(calculate(left, right, op));
   };
-  const precedence = (op: Operator) => op === '×' || op === '÷' ? 2 : 1;
-  tokens.forEach((token) => {
+  const precedence = (op: Operator | '(') => op === '×' || op === '÷' ? 2 : 1;
+  tokens.forEach((token, index) => {
+    if (!token) return;
     if (/^\d|\./.test(token)) {
       values.push(Number(token));
+    } else if ((token === '+' || token === '-') && (index === 0 || tokens[index - 1] === '(' || /[+\-×÷]/.test(tokens[index - 1] ?? '')) && /^\d|\./.test(tokens[index + 1] ?? '')) {
+      values.push(Number(`${token === '-' ? '-' : ''}${tokens[index + 1]}`));
+      tokens[index + 1] = '';
+    } else if (token === '(') {
+      operators.push(token);
+    } else if (token === ')') {
+      while (operators.length && operators[operators.length - 1] !== '(') applyTop();
+      if (operators[operators.length - 1] === '(') operators.pop();
     } else {
       const op = token as Operator;
-      while (operators.length && precedence(operators[operators.length - 1]) >= precedence(op)) applyTop();
+      while (operators.length && operators[operators.length - 1] !== '(' && precedence(operators[operators.length - 1]) >= precedence(op)) applyTop();
       operators.push(op);
     }
   });
-  while (operators.length) applyTop();
+  while (operators.length) {
+    if (operators[operators.length - 1] === '(') operators.pop();
+    else applyTop();
+  }
   return values[0] ?? 0;
 }
 
@@ -163,8 +174,6 @@ export default function CalculatorScreen() {
   const [liveRates, setLiveRates] = useState<Record<string, number>>({ USD: 1, EUR: 0.92, GBP: 0.78, INR: 83.5, JPY: 150.2 });
   const [ratesLoading, setRatesLoading] = useState(false);
   const [ratesUpdatedAt, setRatesUpdatedAt] = useState('');
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const drawerX = useRef(new Animated.Value(290)).current;
   const percentTaps = useRef<number[]>([]);
   const revealScale = useRef(new Animated.Value(1)).current;
   const displayScrollRef = useRef<ScrollView>(null);
@@ -192,10 +201,6 @@ export default function CalculatorScreen() {
       .catch(() => undefined)
       .finally(() => setRatesLoading(false));
   }, [toolPanel]);
-
-  useEffect(() => {
-    Animated.spring(drawerX, { toValue: drawerOpen ? 0 : 290, useNativeDriver: true, bounciness: 3 }).start();
-  }, [drawerOpen, drawerX]);
 
   const saveSoundPreference = (enabled: boolean) => {
     setSoundEnabled(enabled);
@@ -361,6 +366,21 @@ export default function CalculatorScreen() {
   const clear = () => { setDisplay('0'); setLastExpression(''); setHasResult(false); setAudienceBaseResult(null); setAudienceEqualsPresses(0); setAudienceInputActive(false); resetCounter(); };
   const backspace = () => { setLastExpression(''); setHasResult(false); setDisplay((value) => value.length > 1 ? value.slice(0, -1) : '0'); };
   const toggleSign = () => { setLastExpression(''); setHasResult(false); setDisplay((value) => value.replace(/(\d*\.?\d+)$/, (number) => `${Number(number) * -1}`)); };
+  const handleBracket = (bracket: '(' | ')') => {
+    setLastExpression('');
+    setHasResult(false);
+    setDisplay((value) => {
+      if (hasResult) return bracket === '(' ? '(' : value;
+      if (bracket === '(') {
+        if (value === '0') return '(';
+        return /[\d)]$/.test(value) ? `${value}×(` : `${value}(`;
+      }
+      if (value === '0' || /[+\-×÷(]$/.test(value)) return value;
+      const opens = (value.match(/\(/g) ?? []).length;
+      const closes = (value.match(/\)/g) ?? []).length;
+      return opens > closes ? `${value})` : value;
+    });
+  };
   const showAudienceExpression = config?.routineType === 'audience-number' && lastExpression.length > 0;
   const convertedCurrency = (Number(currencyAmount) || 0) * liveRates[currencyTo] / liveRates[currencyFrom];
   const applyScientific = (operation: string) => {
@@ -397,18 +417,18 @@ export default function CalculatorScreen() {
        <Pressable accessibilityLabel="Currency converter" onPress={() => setToolPanel('currency')} style={styles.toolButton}><MaterialCommunityIcons name="currency-usd" size={23} color={colors.foreground} /></Pressable>
      </View>
      <View style={styles.keypad}>
-      <View style={styles.row}><Key label="AC" tone="utility" onPress={clear} testID="clear" /><Key label="⌫" tone="utility" onPress={backspace} icon={<Feather name="delete" size={23} color={colors.primary} />} /><Key label="+/−" tone="utility" onPress={toggleSign} /><Key label="÷" tone="operator" onPress={() => handleOperator('÷')} /></View>
+      <View style={styles.row}><Key label="AC" tone="utility" onPress={clear} testID="clear" /><Key label="()" tone="utility" onPress={() => handleBracket(display.includes('(') && !display.endsWith(')') ? ')' : '(')} /><Key label="%" tone="utility" onPress={tapPercent} testID="percent" /><Key label="÷" tone="operator" onPress={() => handleOperator('÷')} /></View>
       <View style={styles.row}><Key label="7" onPress={() => handleDigit('7')} /><Key label="8" onPress={() => handleDigit('8')} /><Key label="9" onPress={() => handleDigit('9')} /><Key label="×" tone="operator" onPress={() => handleOperator('×')} /></View>
       <View style={styles.row}><Key label="4" onPress={() => handleDigit('4')} /><Key label="5" onPress={() => handleDigit('5')} /><Key label="6" onPress={() => handleDigit('6')} /><Key label="−" tone="operator" onPress={() => handleOperator('-')} /></View>
       <View style={styles.row}><Key label="1" onPress={() => handleDigit('1')} /><Key label="2" onPress={() => handleDigit('2')} /><Key label="3" onPress={() => handleDigit('3')} /><Key label="+" tone="operator" onPress={() => handleOperator('+')} /></View>
-      <View style={styles.row}><Key label="%" tone="utility" onPress={tapPercent} testID="percent" /><Key label="0" onPress={() => handleDigit('0')} /><Key label="." onPress={handleDecimal} /><Key label="=" tone="equals" onPress={handleEquals} testID="equals" /></View>
+      <View style={styles.row}><Key label="⌫" tone="utility" onPress={backspace} icon={<Feather name="delete" size={23} color={colors.primary} />} /><Key label="0" onPress={() => handleDigit('0')} /><Key label="." onPress={handleDecimal} /><Key label="=" tone="equals" onPress={handleEquals} testID="equals" /></View>
     </View>
      <Modal visible={toolPanel !== null} animationType="slide" transparent onRequestClose={() => setToolPanel(null)}>
        <View style={styles.modalBackdrop}><Pressable style={StyleSheet.absoluteFill} onPress={() => setToolPanel(null)} />
          <View style={[styles.toolSheet, { backgroundColor: colors.card }]}>
            <View style={styles.sheetHeader}><Text style={[styles.sheetTitle, { color: colors.foreground }]}>{toolPanel === 'history' ? 'History' : toolPanel === 'scientific' ? 'Scientific' : 'Currency converter'}</Text><Pressable onPress={() => setToolPanel(null)} style={styles.closeButton}><Ionicons name="close" size={22} color={colors.mutedForeground} /></Pressable></View>
            {toolPanel === 'history' && <ScrollView contentContainerStyle={styles.panelContent}>{calculationHistory.length === 0 ? <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Your calculations will appear here.</Text> : calculationHistory.map((item) => <Pressable key={item.id} onPress={() => { setDisplay(item.result); setHasResult(true); setToolPanel(null); }} style={[styles.historyRow, { borderBottomColor: colors.border }]}><Text style={[styles.historyExpression, { color: colors.mutedForeground }]}>{item.expression}</Text><Text style={[styles.historyResult, { color: colors.foreground }]}>= {item.result}</Text></Pressable>)}{calculationHistory.length > 0 && <Pressable onPress={() => { setCalculationHistory([]); AsyncStorage.removeItem('@magical-calculator/calculations'); }} style={[styles.clearHistoryButton, { borderColor: colors.destructive }]}><Text style={[styles.clearHistoryText, { color: colors.destructive }]}>Clear history</Text></Pressable>}</ScrollView>}
-           {toolPanel === 'scientific' && <ScrollView contentContainerStyle={styles.panelContent}><Text style={[styles.panelHint, { color: colors.mutedForeground }]}>Scientific functions use the current display value. Trigonometry uses degrees.</Text><View style={styles.scienceGrid}>{[['2nd', 'second'], ['(', 'open'], [')', 'close'], ['10ˣ', 'tenPower'], ['1/x', 'reciprocal'], ['x²', 'square'], ['x³', 'cube'], ['xʸ', 'power'], ['x!', 'factorial'], ['√', 'sqrt'], ['ʸ√x', 'root'], ['lg', 'log'], ['sin', 'sin'], ['cos', 'cos'], ['tan', 'tan'], ['ln', 'ln'], ['sinh', 'sinh'], ['cosh', 'cosh'], ['tanh', 'tanh'], ['eˣ', 'exp'], ['Rad', 'rad'], ['π', 'pi'], ['EE', 'ee'], ['Rand', 'random']].map(([label, operation]) => <Pressable key={operation} onPress={() => applyScientific(operation)} style={[styles.scienceButton, { backgroundColor: colors.secondary }]}><Text style={[styles.scienceText, { color: colors.foreground }]}>{label}</Text></Pressable>)}</View><View style={styles.memoryRow}>{['mc', 'm+', 'm−', 'mr'].map((label) => <Pressable key={label} style={[styles.memoryButton, { backgroundColor: colors.secondary }]}><Text style={[styles.scienceText, { color: colors.foreground }]}>{label}</Text></Pressable>)}</View></ScrollView>}
+          {toolPanel === 'scientific' && <ScrollView contentContainerStyle={styles.panelContent}><Text style={[styles.panelHint, { color: colors.mutedForeground }]}>Scientific functions use the current display value. Trigonometry uses degrees.</Text><View style={styles.scienceGrid}>{[['2nd', 'second'], ['10ˣ', 'tenPower'], ['1/x', 'reciprocal'], ['x²', 'square'], ['x³', 'cube'], ['xʸ', 'power'], ['x!', 'factorial'], ['√', 'sqrt'], ['ʸ√x', 'root'], ['lg', 'log'], ['sin', 'sin'], ['cos', 'cos'], ['tan', 'tan'], ['ln', 'ln'], ['sinh', 'sinh'], ['cosh', 'cosh'], ['tanh', 'tanh'], ['eˣ', 'exp'], ['Rad', 'rad'], ['π', 'pi'], ['EE', 'ee'], ['Rand', 'random']].map(([label, operation]) => <Pressable key={operation} onPress={() => applyScientific(operation)} style={[styles.scienceButton, { backgroundColor: colors.secondary }]}><Text style={[styles.scienceText, { color: colors.foreground }]}>{label}</Text></Pressable>)}</View><View style={styles.memoryRow}>{['mc', 'm+', 'm−', 'mr'].map((label) => <Pressable key={label} style={[styles.memoryButton, { backgroundColor: colors.secondary }]}><Text style={[styles.scienceText, { color: colors.foreground }]}>{label}</Text></Pressable>)}</View></ScrollView>}
            {toolPanel === 'currency' && <View style={styles.panelContent}><Text style={[styles.panelHint, { color: colors.mutedForeground }]}>{ratesLoading ? 'Updating live exchange rates…' : `Live rates${ratesUpdatedAt ? ` · updated ${ratesUpdatedAt}` : ''}`}</Text><TextInput value={currencyAmount} onChangeText={setCurrencyAmount} keyboardType="decimal-pad" style={[styles.input, { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.secondary }]} /><View style={styles.currencyRow}>{['USD', 'EUR', 'GBP', 'INR', 'JPY'].map((code) => <Pressable key={code} onPress={() => setCurrencyFrom(code)} style={[styles.currencyChip, { backgroundColor: currencyFrom === code ? colors.primary : colors.secondary }]}><Text style={{ color: currencyFrom === code ? colors.primaryForeground : colors.foreground }}>{code}</Text></Pressable>)}</View><Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Convert to</Text><View style={styles.currencyRow}>{['USD', 'EUR', 'GBP', 'INR', 'JPY'].map((code) => <Pressable key={code} onPress={() => setCurrencyTo(code)} style={[styles.currencyChip, { backgroundColor: currencyTo === code ? colors.primary : colors.secondary }]}><Text style={{ color: currencyTo === code ? colors.primaryForeground : colors.foreground }}>{code}</Text></Pressable>)}</View><Text style={[styles.conversionResult, { color: colors.foreground }]}>{formatNumber(convertedCurrency)} {currencyTo}</Text></View>}
          </View>
        </View>
@@ -417,15 +437,6 @@ export default function CalculatorScreen() {
        <View style={styles.modalBackdrop}><Pressable style={StyleSheet.absoluteFill} onPress={() => setSettingsVisible(false)} /><View style={[styles.toolSheet, { backgroundColor: colors.card }]}><View style={styles.sheetHeader}><Text style={[styles.sheetTitle, { color: colors.foreground }]}>Settings</Text><Pressable onPress={() => setSettingsVisible(false)} style={styles.closeButton}><Ionicons name="close" size={22} color={colors.mutedForeground} /></Pressable></View><View style={[styles.settingRow, { borderColor: colors.border }]}><View><Text style={[styles.toggleTitle, { color: colors.foreground }]}>Sound</Text><Text style={[styles.toggleSub, { color: colors.mutedForeground }]}>Button feedback sound</Text></View><Switch value={soundEnabled} onValueChange={saveSoundPreference} trackColor={{ false: colors.border, true: colors.primary }} thumbColor={colors.card} /></View></View></View>
      </Modal>
     <MagicSheet visible={showMagic} onClose={() => setShowMagic(false)} />
-     <Pressable accessibilityLabel="Open calculator slide bar" onPress={() => setDrawerOpen(true)} style={[styles.drawerHandle, { backgroundColor: colors.primary }]}><Feather name="chevron-left" size={20} color={colors.primaryForeground} /></Pressable>
-     <Animated.View pointerEvents={drawerOpen ? 'auto' : 'none'} style={[styles.drawer, { backgroundColor: colors.card, transform: [{ translateX: drawerX }], shadowColor: colors.foreground }]}>
-       <View style={styles.drawerHeader}><Text style={[styles.drawerTitle, { color: colors.foreground }]}>Quick tools</Text><Pressable accessibilityLabel="Close calculator slide bar" onPress={() => setDrawerOpen(false)} style={styles.closeButton}><Ionicons name="close" size={22} color={colors.mutedForeground} /></Pressable></View>
-       <Text style={[styles.drawerHint, { color: colors.mutedForeground }]}>Slide-out calculator shortcuts</Text>
-       <Pressable onPress={() => { setDrawerOpen(false); setToolPanel('history'); }} style={[styles.drawerItem, { backgroundColor: colors.secondary }]}><Feather name="clock" size={22} color={colors.primary} /><Text style={[styles.drawerItemText, { color: colors.foreground }]}>History</Text><Feather name="chevron-right" size={18} color={colors.mutedForeground} /></Pressable>
-       <Pressable onPress={() => { setDrawerOpen(false); setToolPanel('scientific'); }} style={[styles.drawerItem, { backgroundColor: colors.secondary }]}><MaterialCommunityIcons name="function-variant" size={23} color={colors.primary} /><Text style={[styles.drawerItemText, { color: colors.foreground }]}>Scientific</Text><Feather name="chevron-right" size={18} color={colors.mutedForeground} /></Pressable>
-       <Pressable onPress={() => { setDrawerOpen(false); setToolPanel('currency'); }} style={[styles.drawerItem, { backgroundColor: colors.secondary }]}><MaterialCommunityIcons name="currency-usd" size={23} color={colors.primary} /><Text style={[styles.drawerItemText, { color: colors.foreground }]}>Exchange rates</Text><Feather name="chevron-right" size={18} color={colors.mutedForeground} /></Pressable>
-       <Pressable onPress={() => { setDrawerOpen(false); setSettingsVisible(true); }} style={[styles.drawerItem, { backgroundColor: colors.secondary }]}><Feather name="settings" size={22} color={colors.primary} /><Text style={[styles.drawerItemText, { color: colors.foreground }]}>Settings</Text><Feather name="chevron-right" size={18} color={colors.mutedForeground} /></Pressable>
-     </Animated.View>
   </View>;
 }
 
@@ -436,13 +447,6 @@ const styles = StyleSheet.create({
   topBar: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   appTitle: { fontFamily: 'Inter_700Bold', fontSize: 20, letterSpacing: -0.5 },
   iconButton: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
-  drawerHandle: { position: 'absolute', right: 0, top: '48%', width: 30, height: 58, borderTopLeftRadius: 18, borderBottomLeftRadius: 18, alignItems: 'center', justifyContent: 'center', zIndex: 20 },
-  drawer: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 290, paddingHorizontal: 18, paddingTop: 54, zIndex: 30, shadowOffset: { width: -5, height: 0 }, shadowOpacity: 0.18, shadowRadius: 20, elevation: 12 },
-  drawerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  drawerTitle: { fontFamily: 'Inter_700Bold', fontSize: 22 },
-  drawerHint: { fontFamily: 'Inter_400Regular', fontSize: 12, marginTop: 5, marginBottom: 22 },
-  drawerItem: { minHeight: 58, borderRadius: 16, paddingHorizontal: 15, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
-  drawerItemText: { flex: 1, fontFamily: 'Inter_600SemiBold', fontSize: 14 },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   loadingDot: { width: 12, height: 12, borderRadius: 6 },
   displayWrap: { flex: 1, minHeight: 220, justifyContent: 'flex-end', alignItems: 'flex-end', paddingBottom: 30 },
@@ -488,9 +492,9 @@ const styles = StyleSheet.create({
   historyExpression: { fontFamily: 'Inter_400Regular', fontSize: 14 },
   historyResult: { fontFamily: 'Inter_600SemiBold', fontSize: 19, marginTop: 3 },
   panelHint: { fontFamily: 'Inter_400Regular', fontSize: 13, marginBottom: 4 },
-  scienceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  scienceButton: { width: '47%', minHeight: 58, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  scienceText: { fontFamily: 'Inter_600SemiBold', fontSize: 20 },
+  scienceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  scienceButton: { width: '22%', minHeight: 46, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  scienceText: { fontFamily: 'Inter_600SemiBold', fontSize: 16 },
   memoryRow: { flexDirection: 'row', gap: 12, marginTop: 18 },
   memoryButton: { flex: 1, minHeight: 58, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   clearHistoryButton: { minHeight: 48, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginTop: 12 },
