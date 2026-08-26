@@ -85,23 +85,33 @@ function getNextBracket(expression: string): '(' | ')' {
   return '(';
 }
 
-function getKeypadMetrics(width: number) {
-  const horizontalPadding = Math.min(20, Math.max(12, width * 0.05));
-  const gap = Math.min(12, Math.max(6, width * 0.03));
-  const keySize = Math.min(84, Math.max(44, (width - horizontalPadding * 2 - gap * 3) / 4));
-  return { horizontalPadding, gap, keySize };
+function getKeypadMetrics(width: number, height: number) {
+  const compact = width < 360 || height < 680;
+  const horizontalPadding = compact
+    ? Math.min(12, Math.max(8, width * 0.035))
+    : Math.min(20, Math.max(12, width * 0.05));
+  const gap = compact
+    ? Math.min(8, Math.max(4, width * 0.02))
+    : Math.min(12, Math.max(6, width * 0.03));
+  const widthKeySize = (width - horizontalPadding * 2 - gap * 3) / 4;
+  // Reserve space for the top bar, display, tools, and container padding so
+  // all five keypad rows remain visible in a floating/resized window.
+  const reservedHeight = compact ? 184 : 348;
+  const heightKeySize = (height - reservedHeight - gap * 4) / 5;
+  const keySize = Math.floor(Math.min(84, widthKeySize, heightKeySize));
+  return { horizontalPadding, gap, keySize: Math.max(compact ? 26 : 44, keySize), compact };
 }
 
 function Key({ label, tone = 'number', onPress, icon, testID }: { label: string; tone?: 'number' | 'utility' | 'operator' | 'equals'; onPress: () => void; icon?: React.ReactNode; testID?: string }) {
   const colors = useColors();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const scale = useRef(new Animated.Value(1)).current;
-  const { keySize: buttonSize } = getKeypadMetrics(width);
+  const { keySize: buttonSize } = getKeypadMetrics(width, height);
   const bg = tone === 'equals' ? colors.primary : tone === 'utility' || tone === 'operator' ? colors.secondary : colors.numberButton;
   const fg = tone === 'equals' ? colors.primaryForeground : tone === 'utility' || tone === 'operator' ? colors.primary : colors.foreground;
   return <Animated.View style={{ transform: [{ scale }] }}>
     <Pressable testID={testID} onPressIn={() => Animated.spring(scale, { toValue: 0.91, useNativeDriver: true, speed: 30 }).start()} onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: true }).start()} onPress={() => { Haptics.selectionAsync(); onPress(); }} style={[styles.key, { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2, backgroundColor: bg, shadowColor: colors.foreground }]}>
-      {icon ?? <Text numberOfLines={1} allowFontScaling={false} maxFontSizeMultiplier={1} adjustsFontSizeToFit style={[styles.keyText, { color: fg }]}>{label}</Text>}
+      {icon ?? <Text numberOfLines={1} allowFontScaling={false} style={[styles.keyText, { color: fg, width: '100%', fontSize: label.length > 1 ? Math.max(13, Math.min(20, buttonSize * 0.28)) : Math.max(15, Math.min(23, buttonSize * 0.3)) }]}>{label}</Text>}
     </Pressable>
   </Animated.View>;
 }
@@ -175,7 +185,7 @@ export default function CalculatorScreen() {
   const colors = useColors();
   const { theme, setTheme } = useTheme();
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const { config, isLoaded, countOperation, finishReveal, resetCounter } = useMagic();
   const [display, setDisplay] = useState('0');
   const [hasResult, setHasResult] = useState(false);
@@ -414,14 +424,14 @@ export default function CalculatorScreen() {
     addToHistory(`${operation}(${display})`, formatNumber(result));
     setToolPanel(null);
   };
-  const keypadMetrics = getKeypadMetrics(width);
+  const keypadMetrics = getKeypadMetrics(width, height);
   if (!isLoaded) return <View style={[styles.loading, { backgroundColor: colors.background }]}><ActivityIndicator color={colors.primary} /></View>;
-  return <View style={[styles.container, { backgroundColor: colors.background, paddingHorizontal: keypadMetrics.horizontalPadding, paddingTop: Math.max(insets.top, Platform.OS === 'web' ? 67 : 0), paddingBottom: Math.max(insets.bottom, Platform.OS === 'web' ? 34 : 14) }]}>
+  return <View style={[styles.container, keypadMetrics.compact && styles.containerCompact, { backgroundColor: colors.background, paddingHorizontal: keypadMetrics.horizontalPadding, paddingTop: Math.max(insets.top, Platform.OS === 'web' ? 67 : keypadMetrics.compact ? 4 : 0), paddingBottom: Math.max(insets.bottom, Platform.OS === 'web' ? 34 : keypadMetrics.compact ? 6 : 14) }]}>
      <StatusBar barStyle={theme === 'dark' ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
-      <View style={styles.topBar}>
+       <View style={[styles.topBar, keypadMetrics.compact && styles.topBarCompact]}>
         <Pressable accessibilityLabel="Settings" onPress={() => setSettingsVisible(true)} style={styles.iconButton}><Feather name="settings" size={22} color={colors.foreground} /></Pressable>
       </View>
-    <View style={styles.displayWrap}>
+     <View style={[styles.displayWrap, keypadMetrics.compact && styles.displayWrapCompact]}>
       <ScrollView ref={displayScrollRef} horizontal showsHorizontalScrollIndicator={false} directionalLockEnabled contentContainerStyle={styles.displayScrollContent} style={styles.displayScroll} scrollEventThrottle={16}>
         {hasResult && showAudienceExpression ? (
           <View style={styles.resultStack}>
@@ -433,12 +443,12 @@ export default function CalculatorScreen() {
         )}
       </ScrollView>
     </View>
-     <View style={[styles.toolBar, { borderColor: colors.border }]}>
+      <View style={[styles.toolBar, keypadMetrics.compact && styles.toolBarCompact, { borderColor: colors.border }]}>
         <Pressable accessibilityLabel="Calculation history" onPress={() => setToolPanel('history')} style={styles.toolButton}><MaterialCommunityIcons name="history" size={25} color={colors.foreground} /></Pressable>
         <Pressable accessibilityLabel="Scientific calculator" onPress={() => setToolPanel('scientific')} style={styles.toolButton}><Text style={[styles.toolGlyph, { color: colors.foreground }]}>fₓ</Text></Pressable>
         <Pressable accessibilityLabel="Currency converter" onPress={() => setToolPanel('currency')} style={styles.toolButton}><Text style={[styles.toolGlyph, { color: colors.foreground }]}>$</Text></Pressable>
      </View>
-     <View style={[styles.keypad, { gap: keypadMetrics.gap }]}>
+      <View style={[styles.keypad, { gap: keypadMetrics.gap }]}>
        <View style={[styles.row, { gap: keypadMetrics.gap }]}><Key label="AC" tone="utility" onPress={clear} testID="clear" /><Key label="()" tone="utility" onPress={() => handleBracket(getNextBracket(display))} /><Key label="%" tone="utility" onPress={tapPercent} testID="percent" /><Key label="÷" tone="operator" onPress={() => handleOperator('÷')} /></View>
       <View style={[styles.row, { gap: keypadMetrics.gap }]}><Key label="7" onPress={() => handleDigit('7')} /><Key label="8" onPress={() => handleDigit('8')} /><Key label="9" onPress={() => handleDigit('9')} /><Key label="×" tone="operator" onPress={() => handleOperator('×')} /></View>
       <View style={[styles.row, { gap: keypadMetrics.gap }]}><Key label="4" onPress={() => handleDigit('4')} /><Key label="5" onPress={() => handleDigit('5')} /><Key label="6" onPress={() => handleDigit('6')} /><Key label="−" tone="operator" onPress={() => handleOperator('-')} /></View>
@@ -465,12 +475,15 @@ export default function CalculatorScreen() {
 function ActivityIndicator({ color }: { color: string }) { return <View style={[styles.loadingDot, { backgroundColor: color }]} />; }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 20 },
+  container: { flex: 1, paddingHorizontal: 20, minWidth: 0 },
+  containerCompact: { overflow: 'hidden' },
   topBar: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' },
+  topBarCompact: { minHeight: 38 },
   iconButton: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   loadingDot: { width: 12, height: 12, borderRadius: 6 },
-  displayWrap: { flex: 1, minHeight: 220, justifyContent: 'flex-end', alignItems: 'flex-end', paddingBottom: 30 },
+  displayWrap: { flex: 1, minHeight: 150, minWidth: 0, justifyContent: 'flex-end', alignItems: 'flex-end', paddingBottom: 30 },
+  displayWrapCompact: { minHeight: 70, paddingBottom: 10 },
   displayScroll: { width: '100%' },
   displayScrollContent: { minWidth: '100%', alignItems: 'flex-end', justifyContent: 'flex-end' },
   resultStack: { alignItems: 'flex-end' },
@@ -482,7 +495,7 @@ const styles = StyleSheet.create({
   toolGlyph: { fontFamily: 'Inter_600SemiBold', fontSize: 23, lineHeight: 28 },
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
   key: { width: 70, height: 70, borderRadius: 35, alignItems: 'center', justifyContent: 'center', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 2 },
-  keyText: { fontFamily: 'Inter_600SemiBold', fontSize: 23 },
+  keyText: { fontFamily: 'Inter_600SemiBold', fontSize: 23, textAlign: 'center', flexShrink: 1 },
   modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(15, 25, 47, 0.36)' },
   sheet: { borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingTop: 10, maxHeight: '92%', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.15, shadowRadius: 24, elevation: 10 },
   sheetHandle: { alignSelf: 'center', width: 38, height: 4, borderRadius: 2, backgroundColor: '#CBD4E4', marginBottom: 18 },
@@ -507,6 +520,7 @@ const styles = StyleSheet.create({
   advancedCaption: { fontFamily: 'Inter_400Regular', fontSize: 12, lineHeight: 18 },
   disableText: { fontFamily: 'Inter_600SemiBold', fontSize: 12, marginTop: 4 },
   sheetActions: { flexDirection: 'row', gap: 10, marginTop: 24 },
+  toolBarCompact: { paddingTop: 8, paddingBottom: 8, gap: 16 },
   toolSheet: { borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingTop: 22, paddingBottom: 32, maxHeight: '78%', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.15, shadowRadius: 24, elevation: 10 },
   panelContent: { padding: 24, gap: 14 },
   emptyText: { textAlign: 'center', paddingVertical: 30, fontFamily: 'Inter_400Regular' },
