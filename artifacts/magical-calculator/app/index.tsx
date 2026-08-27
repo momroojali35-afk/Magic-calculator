@@ -67,6 +67,20 @@ function formatNumber(value: number) {
   return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(10)));
 }
 
+function applyPercentage(expression: string) {
+  const match = expression.match(/^(.*)([+\-×÷])(-?\d*\.?\d+)$/);
+  if (!match || !match[1]) return expression.replace(/(\d*\.?\d+)$/, (number) => String(Number(number) / 100));
+
+  const base = evaluateExpression(match[1]);
+  const operand = Number(match[3]);
+  if (!Number.isFinite(base) || !Number.isFinite(operand)) return expression;
+
+  const percentage = match[2] === '+' || match[2] === '-'
+    ? (base * operand) / 100
+    : operand / 100;
+  return match[1] + match[2] + formatNumber(percentage);
+}
+
 function replaceFinalOperand(expression: string, operand: number) {
   const match = expression.match(/(\d*\.?\d+)$/);
   if (!match || match.index === undefined) return expression;
@@ -186,7 +200,7 @@ export default function CalculatorScreen() {
   const { theme, setTheme } = useTheme();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
-  const { config, isLoaded, countOperation, finishReveal, resetCounter } = useMagic();
+  const { config, countOperation, finishReveal, resetCounter } = useMagic();
   const [display, setDisplay] = useState('0');
   const [hasResult, setHasResult] = useState(false);
   const [lastExpression, setLastExpression] = useState('');
@@ -255,7 +269,7 @@ export default function CalculatorScreen() {
     const now = Date.now();
     percentTaps.current = [...percentTaps.current.filter((time) => now - time < 760), now];
     if (percentTaps.current.length === 3) { percentTaps.current = []; setShowMagic(true); return; }
-    setDisplay((value) => value.replace(/(\d*\.?\d+)$/, (number) => String(Number(number) / 100)));
+    setDisplay((value) => applyPercentage(value));
     setLastExpression('');
     setHasResult(false);
   };
@@ -425,7 +439,6 @@ export default function CalculatorScreen() {
     setToolPanel(null);
   };
   const keypadMetrics = getKeypadMetrics(width, height);
-  if (!isLoaded) return <View style={[styles.loading, { backgroundColor: colors.background }]}><ActivityIndicator color={colors.primary} /></View>;
   return <View style={[styles.container, keypadMetrics.compact && styles.containerCompact, { backgroundColor: colors.background, paddingHorizontal: keypadMetrics.horizontalPadding, paddingTop: Math.max(insets.top, Platform.OS === 'web' ? 67 : keypadMetrics.compact ? 4 : 0), paddingBottom: Math.max(insets.bottom, Platform.OS === 'web' ? 34 : keypadMetrics.compact ? 6 : 14) }]}>
      <StatusBar barStyle={theme === 'dark' ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
        <View style={[styles.topBar, keypadMetrics.compact && styles.topBarCompact]}>
@@ -472,7 +485,6 @@ export default function CalculatorScreen() {
   </View>;
 }
 
-function ActivityIndicator({ color }: { color: string }) { return <View style={[styles.loadingDot, { backgroundColor: color }]} />; }
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 20, minWidth: 0 },
@@ -480,8 +492,6 @@ const styles = StyleSheet.create({
   topBar: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' },
   topBarCompact: { minHeight: 38 },
   iconButton: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
-  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  loadingDot: { width: 12, height: 12, borderRadius: 6 },
   displayWrap: { flex: 1, minHeight: 150, minWidth: 0, justifyContent: 'flex-end', alignItems: 'flex-end', paddingBottom: 30 },
   displayWrapCompact: { minHeight: 70, paddingBottom: 10 },
   displayScroll: { width: '100%' },
