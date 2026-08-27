@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors, useTheme } from '@/hooks/useColors';
 import { RevealType, RoutineType, TriggerMethod, useMagic } from '@/context/MagicContext';
 
-type Operator = '+' | '-' | '×' | '÷' | null;
+type Operator = '+' | '-' | '×' | '÷' | '%' | null;
 type ToolPanel = 'history' | 'scientific' | 'currency' | null;
 type CalculationRecord = { expression: string; result: string; id: string };
 
@@ -22,11 +22,12 @@ function calculate(a: number, b: number, op: Operator) {
   if (op === '-') return a - b;
   if (op === '×') return a * b;
   if (op === '÷') return b === 0 ? NaN : a / b;
+  if (op === '%') return (a * b) / 100;
   return b;
 }
 
 function evaluateExpression(expression: string) {
-  const tokens = expression.replace(/−/g, '-').match(/(?:\d+\.?\d*|\.\d+|[()+\-×÷])/g) ?? [];
+  const tokens = expression.replace(/−/g, '-').match(/(?:\d+\.?\d*|\.\d+|[()+\-×÷%])/g) ?? [];
   const values: number[] = [];
   const operators: Array<Operator | '('> = [];
   const applyTop = () => {
@@ -36,12 +37,12 @@ function evaluateExpression(expression: string) {
     const left = values.pop() ?? 0;
     values.push(calculate(left, right, op));
   };
-  const precedence = (op: Operator | '(') => op === '×' || op === '÷' ? 2 : 1;
+  const precedence = (op: Operator | '(') => op === '×' || op === '÷' || op === '%' ? 2 : 1;
   tokens.forEach((token, index) => {
     if (!token) return;
     if (/^\d|\./.test(token)) {
       values.push(Number(token));
-    } else if ((token === '+' || token === '-') && (index === 0 || tokens[index - 1] === '(' || /[+\-×÷]/.test(tokens[index - 1] ?? '')) && /^\d|\./.test(tokens[index + 1] ?? '')) {
+    } else if ((token === '+' || token === '-') && (index === 0 || tokens[index - 1] === '(' || /[+\-×÷%]/.test(tokens[index - 1] ?? '')) && /^\d|\./.test(tokens[index + 1] ?? '')) {
       values.push(Number(`${token === '-' ? '-' : ''}${tokens[index + 1]}`));
       tokens[index + 1] = '';
     } else if (token === '(') {
@@ -67,18 +68,11 @@ function formatNumber(value: number) {
   return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(10)));
 }
 
-function applyPercentage(expression: string) {
-  const match = expression.match(/^(.*)([+\-×÷])(-?\d*\.?\d+)$/);
-  if (!match || !match[1]) return expression.replace(/(\d*\.?\d+)$/, (number) => String(Number(number) / 100));
-
-  const base = evaluateExpression(match[1]);
-  const operand = Number(match[3]);
-  if (!Number.isFinite(base) || !Number.isFinite(operand)) return expression;
-
-  const percentage = match[2] === '+' || match[2] === '-'
-    ? (base * operand) / 100
-    : operand / 100;
-  return match[1] + match[2] + formatNumber(percentage);
+function formatPercentageExpression(expression: string) {
+  return expression.replace(/\d+(?:\.\d+)?/g, (number) => {
+    const [whole, fraction] = number.split('.');
+    return Number(whole).toLocaleString('en-US') + (fraction ? '.' + fraction : '');
+  });
 }
 
 function replaceFinalOperand(expression: string, operand: number) {
@@ -90,7 +84,7 @@ function replaceFinalOperand(expression: string, operand: number) {
 function getNextBracket(expression: string): '(' | ')' {
   const openCount = (expression.match(/\(/g) ?? []).length;
   const closeCount = (expression.match(/\)/g) ?? []).length;
-  const endsWithOperatorOrOpen = /[+\-×÷(]$/.test(expression);
+  const endsWithOperatorOrOpen = /[+\-×÷%(]$/.test(expression);
 
   // Close the innermost open group whenever the current value can be closed.
   // Otherwise start a new group, allowing expressions such as:
@@ -269,7 +263,7 @@ export default function CalculatorScreen() {
     const now = Date.now();
     percentTaps.current = [...percentTaps.current.filter((time) => now - time < 760), now];
     if (percentTaps.current.length === 3) { percentTaps.current = []; setShowMagic(true); return; }
-    setDisplay((value) => applyPercentage(value));
+    setDisplay((value) => /[+\-×÷%]$/.test(value) ? value : value + '%');
     setLastExpression('');
     setHasResult(false);
   };
@@ -319,11 +313,11 @@ export default function CalculatorScreen() {
       setHasResult(false);
       return;
     }
-    setDisplay((value) => /[+\-×÷]$/.test(value) ? `${value.slice(0, -1)}${nextOperator}` : `${value}${nextOperator}`);
+    setDisplay((value) => /[+\-×÷%]$/.test(value) ? `${value.slice(0, -1)}${nextOperator}` : `${value}${nextOperator}`);
     setLastExpression('');
   };
   const handleEquals = async () => {
-    if (/[+\-×÷]$/.test(display)) return;
+    if (/[+\-×÷%]$/.test(display)) return;
     const expressionBeforeEquals = display;
     const isAudienceRoutine = config?.enabled && config.routineType === 'audience-number';
     const audienceTriggerCount = Math.max(1, Number(config?.triggerCount ?? 1));
@@ -427,6 +421,7 @@ export default function CalculatorScreen() {
     });
   };
   const showAudienceExpression = config?.routineType === 'audience-number' && lastExpression.length > 0;
+  const showPercentageExpression = lastExpression.includes('%');
   const convertedCurrency = (Number(currencyAmount) || 0) * liveRates[currencyTo] / liveRates[currencyFrom];
   const applyScientific = (operation: string) => {
     const value = Number(display);
@@ -446,9 +441,9 @@ export default function CalculatorScreen() {
       </View>
      <View style={[styles.displayWrap, keypadMetrics.compact && styles.displayWrapCompact]}>
       <ScrollView ref={displayScrollRef} horizontal showsHorizontalScrollIndicator={false} directionalLockEnabled contentContainerStyle={styles.displayScrollContent} style={styles.displayScroll} scrollEventThrottle={16}>
-        {hasResult && showAudienceExpression ? (
+        {hasResult && (showAudienceExpression || showPercentageExpression) ? (
           <View style={styles.resultStack}>
-            <Text numberOfLines={1} style={[styles.displayExpression, { color: colors.mutedForeground }]}>{lastExpression}</Text>
+            <Text numberOfLines={1} style={[styles.displayExpression, { color: colors.mutedForeground }]}>{showPercentageExpression ? formatPercentageExpression(lastExpression) : lastExpression}</Text>
             <Animated.Text numberOfLines={1} style={[styles.displayResult, { color: revealing ? colors.primary : colors.foreground, transform: [{ scale: revealScale }] }]}>{display}</Animated.Text>
           </View>
         ) : (
