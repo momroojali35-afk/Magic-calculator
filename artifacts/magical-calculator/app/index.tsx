@@ -71,7 +71,8 @@ function formatNumber(value: number) {
 function formatPercentageExpression(expression: string) {
   return expression.replace(/\d+(?:\.\d+)?/g, (number) => {
     const [whole, fraction] = number.split('.');
-    return Number(whole).toLocaleString('en-US') + (fraction ? '.' + fraction : '');
+    const groupedWhole = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return groupedWhole + (fraction ? '.' + fraction : '');
   });
 }
 
