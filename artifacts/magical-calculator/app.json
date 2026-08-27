@@ -29,13 +29,6 @@
         }
       ],
       "expo-font",
-      [
-        "expo-splash-screen",
-        {
-          "backgroundColor": "#FFFFFF",
-          "resizeMode": "cover"
-        }
-      ],
       "expo-web-browser"
     ],
     "experiments": {
