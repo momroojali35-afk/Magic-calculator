@@ -111,7 +111,7 @@ function Key({ label, tone = 'number', onPress, icon, testID }: { label: string;
   const fg = tone === 'equals' ? colors.primaryForeground : tone === 'utility' || tone === 'operator' ? colors.primary : colors.foreground;
   return <Animated.View style={{ transform: [{ scale }] }}>
     <Pressable testID={testID} onPressIn={() => Animated.spring(scale, { toValue: 0.91, useNativeDriver: true, speed: 30 }).start()} onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: true }).start()} onPress={() => { Haptics.selectionAsync(); onPress(); }} style={[styles.key, { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2, backgroundColor: bg, shadowColor: colors.foreground }]}>
-      {icon ?? <Text numberOfLines={1} allowFontScaling={false} style={[styles.keyText, { color: fg, width: '100%', fontSize: label.length > 1 ? Math.max(13, Math.min(20, buttonSize * 0.28)) : Math.max(15, Math.min(23, buttonSize * 0.3)) }]}>{label}</Text>}
+      {icon ?? <Text numberOfLines={1} allowFontScaling={false} style={[styles.keyText, { color: fg, width: '100%', fontSize: label.length > 1 ? Math.max(15, Math.min(22, buttonSize * 0.27)) : Math.max(18, Math.min(30, buttonSize * 0.36)) }]}>{label}</Text>}
     </Pressable>
   </Animated.View>;
 }
@@ -445,7 +445,7 @@ export default function CalculatorScreen() {
     </View>
       <View style={[styles.toolBar, keypadMetrics.compact && styles.toolBarCompact, { borderColor: colors.border }]}>
         <Pressable accessibilityLabel="Calculation history" onPress={() => setToolPanel('history')} style={styles.toolButton}><MaterialCommunityIcons name="history" size={25} color={colors.foreground} /></Pressable>
-        <Pressable accessibilityLabel="Scientific calculator" onPress={() => setToolPanel('scientific')} style={styles.toolButton}><Text style={[styles.toolGlyph, { color: colors.foreground }]}>fₓ</Text></Pressable>
+        <Pressable accessibilityLabel="Scientific calculator" onPress={() => setToolPanel('scientific')} style={styles.toolButton}><Text style={[styles.toolGlyph, { color: colors.foreground }]}>fx</Text></Pressable>
         <Pressable accessibilityLabel="Currency converter" onPress={() => setToolPanel('currency')} style={styles.toolButton}><Text style={[styles.toolGlyph, { color: colors.foreground }]}>$</Text></Pressable>
      </View>
       <View style={[styles.keypad, { gap: keypadMetrics.gap }]}>
@@ -495,7 +495,7 @@ const styles = StyleSheet.create({
   toolGlyph: { fontFamily: 'Inter_600SemiBold', fontSize: 23, lineHeight: 28 },
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
   key: { width: 70, height: 70, borderRadius: 35, alignItems: 'center', justifyContent: 'center', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 2 },
-  keyText: { fontFamily: 'Inter_600SemiBold', fontSize: 23, textAlign: 'center', flexShrink: 1 },
+  keyText: { fontFamily: 'Inter_600SemiBold', fontSize: 23, textAlign: 'center', flexShrink: 0, includeFontPadding: false },
   modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(15, 25, 47, 0.36)' },
   sheet: { borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingTop: 10, maxHeight: '92%', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.15, shadowRadius: 24, elevation: 10 },
   sheetHandle: { alignSelf: 'center', width: 38, height: 4, borderRadius: 2, backgroundColor: '#CBD4E4', marginBottom: 18 },
