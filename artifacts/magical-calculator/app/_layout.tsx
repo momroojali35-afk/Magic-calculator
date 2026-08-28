@@ -30,7 +30,7 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
-  useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
     Inter_600SemiBold,
@@ -38,8 +38,14 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    SplashScreen.hideAsync().catch(() => undefined);
-  }, []);
+    if (fontsLoaded || fontError) {
+      SplashScreen.hideAsync().catch(() => undefined);
+    }
+  }, [fontsLoaded, fontError]);
+
+  if (!fontsLoaded && !fontError) {
+    return null;
+  }
 
   return (
     <SafeAreaProvider style={{ flex: 1 }}>
