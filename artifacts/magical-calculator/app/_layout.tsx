@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -14,9 +14,11 @@ import {
 } from '@expo-google-fonts/inter';
 import { Stack } from 'expo-router';
 import { MagicProvider } from '@/context/MagicContext';
+import * as SplashScreen from 'expo-splash-screen';
 
 
 const queryClient = new QueryClient();
+SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 
 function RootLayoutNav() {
@@ -34,6 +36,10 @@ export default function RootLayout() {
     Inter_600SemiBold,
     Inter_700Bold,
   });
+
+  useEffect(() => {
+    SplashScreen.hideAsync().catch(() => undefined);
+  }, []);
 
   return (
     <SafeAreaProvider style={{ flex: 1 }}>
