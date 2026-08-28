@@ -263,7 +263,7 @@ export default function CalculatorScreen() {
   const tapPercent = () => {
     const now = Date.now();
     percentTaps.current = [...percentTaps.current.filter((time) => now - time < 760), now];
-    if (percentTaps.current.length === 3) { percentTaps.current = []; setShowMagic(true); return; }
+    if (percentTaps.current.length === 3) { percentTaps.current = []; setDisplay((value) => value.endsWith('%') ? value : value + '%'); setShowMagic(true); return; }
     setDisplay((value) => /[+\-×÷%]$/.test(value) ? value : value + '%');
     setLastExpression('');
     setHasResult(false);
