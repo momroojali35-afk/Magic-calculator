@@ -260,13 +260,21 @@ export default function CalculatorScreen() {
     return () => cancelAnimationFrame(frame);
   }, [display, hasResult]);
 
-  const tapPercent = () => {
-    const now = Date.now();
-    percentTaps.current = [...percentTaps.current.filter((time) => now - time < 760), now];
-    if (percentTaps.current.length === 3) { percentTaps.current = []; setDisplay((value) => value.endsWith('%') ? value : value + '%'); setShowMagic(true); return; }
+  const appendPercent = () => {
     setDisplay((value) => /[+\-×÷%]$/.test(value) ? value : value + '%');
     setLastExpression('');
     setHasResult(false);
+  };
+  const tapPercent = () => {
+    const now = Date.now();
+    percentTaps.current = [...percentTaps.current.filter((time) => now - time < 760), now];
+    if (percentTaps.current.length >= 3) {
+      percentTaps.current = [];
+      appendPercent();
+      setShowMagic(true);
+      return;
+    }
+    appendPercent();
   };
   const handleDigit = (digit: string) => {
     const isStartingAudienceInput = config?.enabled && config.routineType === 'audience-number' && audienceBaseResult !== null && hasResult && !audienceInputActive;
@@ -493,8 +501,8 @@ const styles = StyleSheet.create({
   displayScroll: { width: '100%' },
   displayScrollContent: { minWidth: '100%', alignItems: 'flex-end', justifyContent: 'flex-end' },
   resultStack: { alignItems: 'flex-end' },
-  displayExpression: { fontFamily: 'Inter_400Regular', fontSize: 58, letterSpacing: -1.8 },
-  displayResult: { fontFamily: 'Inter_500Medium', fontSize: 44, letterSpacing: -1.2, marginTop: 12 },
+  displayExpression: { fontFamily: 'Inter_600SemiBold', fontSize: 58, letterSpacing: -1.8 },
+  displayResult: { fontFamily: 'Inter_700Bold', fontSize: 44, letterSpacing: -1.2, marginTop: 12 },
   keypad: { gap: 12 },
   toolBar: { flexDirection: 'row', alignItems: 'center', gap: 28, borderTopWidth: 1, paddingTop: 14, paddingBottom: 14, paddingHorizontal: 10 },
   toolButton: { width: 44, height: 38, alignItems: 'center', justifyContent: 'center' },
